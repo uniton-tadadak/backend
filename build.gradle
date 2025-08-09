@@ -1,0 +1,68 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.5.4'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.unithon'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+
+	runtimeOnly 'com.mysql:mysql-connector-j:8.0.33'
+
+	// JWT
+	implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+	// Swagger
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
+
+	// 테스트
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+	// 테스트에서 사용하는 spring-core도 버전 고정
+	testImplementation 'org.springframework:spring-core:6.1.6'
+	testImplementation 'org.springframework:spring-context:6.1.6'
+	testImplementation 'org.springframework:spring-test:6.1.6'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+//configurations.all {
+//	resolutionStrategy {
+//		eachDependency { details ->
+//			if (details.requested.group == 'org.springframework') {
+//				if (details.requested.name == 'spring-web' ||
+//						details.requested.name == 'spring-context' ||
+//						details.requested.name == 'spring-core') {
+//					details.useVersion '6.1.6'
+//				}
+//			}
+//		}
+//	}
+//}

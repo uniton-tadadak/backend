@@ -1,0 +1,40 @@
+### 1. 회원가입 (기본)
+POST http://localhost:8080/api/users
+Content-Type: application/json
+
+{
+  "username": "김철수",
+  "trustScore": 36.5,
+  "penaltyCount": 0,
+  "praiseCount": 5,
+  "moneyWeight": 0.4,
+  "distanceWeight": 0.3,
+  "trustWeight": 0.3
+}
+
+### 2. 회원가입 (signup 경로)
+POST http://localhost:8080/api/users/signup
+Content-Type: application/json
+
+{
+  "username": "이영희",
+  "trustScore": 42.0,
+  "penaltyCount": 1,
+  "praiseCount": 8,
+  "moneyWeight": 0.3,
+  "distanceWeight": 0.4,
+  "trustWeight": 0.3
+}
+
+### 3. 사용자 조회
+GET http://localhost:8080/api/users/1
+
+### 4. 가중치 업데이트
+PUT http://localhost:8080/api/users/1/weights
+Content-Type: application/json
+
+{
+  "moneyWeight": 0.5,
+  "distanceWeight": 0.2,
+  "trustWeight": 0.3
+} 
