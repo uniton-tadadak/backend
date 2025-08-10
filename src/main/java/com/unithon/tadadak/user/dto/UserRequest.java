@@ -8,6 +8,7 @@ import lombok.*;
 @AllArgsConstructor
 public class UserRequest {
     private String username;
+    private String password;  // JWT 인증을 위한 패스워드 필드 추가
     private Float trustScore;
     private int penaltyCount;
     private int praiseCount;

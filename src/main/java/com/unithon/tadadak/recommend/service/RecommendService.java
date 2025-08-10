@@ -9,12 +9,15 @@ import com.unithon.tadadak.post.repository.PostRepository;
 import com.unithon.tadadak.user.domain.User;
 import com.unithon.tadadak.user.repository.UserRepository;
 import com.unithon.tadadak.groupmember.repository.GroupMemberRepository;
+import com.unithon.tadadak.groupmember.domain.GroupMember;
 import com.unithon.tadadak.groups.repository.GroupsRepository;
+import com.unithon.tadadak.groups.domain.Groups;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.ArrayList;
 
 @Slf4j
 @Service
@@ -63,9 +66,9 @@ public class RecommendService {
                 return List.of();
             }
             
-            // 5) 거리와 신뢰도 계산하여 후보 생성
+            // 5) 거리와 신뢰도 계산하여 후보 생성 (도착지 정보 포함)
             List<Candidate> candidates = filteredPosts.stream()
-                    .map(post -> createCandidate(post, depLat, depLng))
+                    .map(post -> createCandidate(post, depLat, depLng, destLat, destLng))
                     .toList();
             
             // 6) AI 호출
@@ -287,7 +290,7 @@ public class RecommendService {
     }
     
     /**
-     * 📝 Post에서 Candidate 객체 생성 (거리 계산 포함)
+     * 📝 Post에서 Candidate 객체 생성 (출발지만 고려한 기존 방식)
      */
     private Candidate createCandidate(Post post, double userLat, double userLng) {
         // 사용자 위치에서 Post 시작점까지의 거리 계산 (Haversine)
@@ -297,11 +300,50 @@ public class RecommendService {
             post.getStartLocation().getLongitude()
         );
         
+        // 🆕 그룹 멤버들의 평균 trust 계산
+        double averageTrust = calculateGroupAverageTrust(post);
+        
         return new Candidate(
             post.getPostId(),
             post.getEstimatedPrice().doubleValue(),
             distance,
-            post.getHost().getTrustScore().doubleValue()
+            averageTrust  // 🆕 그룹 멤버 평균 trust
+        );
+    }
+    
+    /**
+     * 📝 Post에서 Candidate 객체 생성 (출발지 + 도착지 모두 고려)
+     */
+    private Candidate createCandidate(Post post, double userDepLat, double userDepLng, 
+                                    double userDestLat, double userDestLng) {
+        // 1) 사용자 출발지 → Post 출발지 거리
+        double departureDistance = calculateDistance(
+            userDepLat, userDepLng, 
+            post.getStartLocation().getLatitude(), 
+            post.getStartLocation().getLongitude()
+        );
+        
+        // 2) 사용자 도착지 → Post 도착지 거리
+        double destinationDistance = calculateDistance(
+            userDestLat, userDestLng,
+            post.getEndLocation().getLatitude(),
+            post.getEndLocation().getLongitude()
+        );
+        
+        // 3) 종합 거리 점수 (출발지 + 도착지 거리의 평균)
+        double totalDistance = (departureDistance + destinationDistance) / 2.0;
+        
+        // 4) 🆕 그룹 멤버들의 평균 trust 계산
+        double averageTrust = calculateGroupAverageTrust(post);
+        
+        log.debug("Post {}: 출발지 거리={}m, 도착지 거리={}m, 종합 거리={}m, 평균 trust={}", 
+                post.getPostId(), departureDistance, destinationDistance, totalDistance, averageTrust);
+        
+        return new Candidate(
+            post.getPostId(),
+            post.getEstimatedPrice().doubleValue(),
+            totalDistance,  // 🆕 출발지 + 도착지 종합 거리
+            averageTrust    // 🆕 그룹 멤버 평균 trust
         );
     }
     
@@ -321,6 +363,57 @@ public class RecommendService {
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         
         return R * c;
+    }
+    
+    /**
+     * 📝 그룹 멤버들의 평균 trust 계산
+     */
+    private double calculateGroupAverageTrust(Post post) {
+        try {
+            // Post의 모든 그룹 조회
+            List<Groups> groups = post.getGroups();
+            
+            if (groups.isEmpty()) {
+                log.warn("Post {}에 그룹이 없습니다. 호스트 trust를 사용합니다.", post.getPostId());
+                return nullToZero(post.getHost().getTrustScore());
+            }
+            
+            // 모든 그룹의 멤버들 수집
+            List<GroupMember> allMembers = new ArrayList<>();
+            for (Groups group : groups) {
+                List<GroupMember> groupMembers = groupMemberRepository.findByGroupId(group.getGroupId());
+                allMembers.addAll(groupMembers);
+            }
+            
+            if (allMembers.isEmpty()) {
+                log.warn("Post {}의 그룹에 멤버가 없습니다. 호스트 trust를 사용합니다.", post.getPostId());
+                return nullToZero(post.getHost().getTrustScore());
+            }
+            
+            // 멤버들의 trust 평균 계산
+            double totalTrust = allMembers.stream()
+                    .mapToDouble(member -> nullToZero(member.getUser().getTrustScore()))
+                    .sum();
+            
+            double averageTrust = totalTrust / allMembers.size();
+            
+            log.debug("Post {}: {}명의 멤버 평균 trust = {}", 
+                    post.getPostId(), allMembers.size(), averageTrust);
+            
+            return averageTrust;
+            
+        } catch (Exception e) {
+            log.error("Post {} 그룹 멤버 trust 계산 실패: {}", post.getPostId(), e.getMessage(), e);
+            // 에러 발생 시 호스트 trust로 fallback
+            return nullToZero(post.getHost().getTrustScore());
+        }
+    }
+    
+    /**
+     * 📝 Float 타입 trustScore를 double로 변환 (null 안전)
+     */
+    private double nullToZero(Float v) { 
+        return v == null ? 0.0 : v.doubleValue(); 
     }
     
     private double nullToZero(Integer v) { 

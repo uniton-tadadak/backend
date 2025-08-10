@@ -23,6 +23,9 @@ public class User {
     @Column(nullable = false, unique = true, length = 50)
     private String username;
 
+    @Column(nullable = false)
+    private String password;
+
     @Column(name = "trust_score", nullable = false)
     private Float trustScore;
 

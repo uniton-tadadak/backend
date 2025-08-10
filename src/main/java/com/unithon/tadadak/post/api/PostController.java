@@ -6,6 +6,7 @@ import com.unithon.tadadak.post.dto.PostRequestDto;
 import com.unithon.tadadak.post.dto.PostResponseDto;
 import com.unithon.tadadak.post.service.PostService;
 import com.unithon.tadadak.recommend.service.RecommendService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,11 @@ public class PostController {
     private final RecommendService recommendService;
 
     @PostMapping
-    public ResponseEntity<PostResponseDto> create(@RequestBody PostRequestDto dto) {
+    public ResponseEntity<PostResponseDto> create(@RequestBody PostRequestDto dto, HttpServletRequest request) {
+        // JWT에서 사용자 ID 추출하여 hostId로 설정
+        Long userId = getCurrentUserId(request);
+        dto.setHostId(userId);  // DTO에 setHostId 메서드가 있어야 함
+        
         Post post = postService.createPost(dto);
         return ResponseEntity.ok(PostResponseDto.fromEntity(post));
     }
@@ -31,7 +36,13 @@ public class PostController {
      */
     @PostMapping("/with-locations")
     public ResponseEntity<PostResponseDto> createWithLocations(
-            @RequestBody PostService.CreatePostWithLocationsRequest request) {
+            @RequestBody PostService.CreatePostWithLocationsRequest request,
+            HttpServletRequest httpRequest) {
+        // JWT에서 사용자 ID 추출하여 hostId로 설정
+        Long userId = getCurrentUserId(httpRequest);
+        // CreatePostWithLocationsRequest에 setHostId 메서드가 있다면 설정
+        // request.setHostId(userId);  // 필요 시 추가
+        
         PostResponseDto result = postService.createPostWithLocations(request);
         return ResponseEntity.ok(result);
     }
@@ -53,9 +64,10 @@ public class PostController {
             @RequestParam double destLat,  // 도착지 위도
             @RequestParam double destLng,  // 도착지 경도
             @RequestParam(defaultValue = "1000") double radius, // 허용 반경(미터)
-            @RequestParam(defaultValue = "10") int topN
+            @RequestParam(defaultValue = "10") int topN,
+            HttpServletRequest request
     ) {
-        Long userId = currentUserId();
+        Long userId = getCurrentUserId(request);
         
         // 1) AI 추천으로 Post ID 목록 가져오기 (route-based)
         List<Long> recommendedIds = recommendService.recommendByRoute(userId, depLat, depLng, destLat, destLng, radius, topN);
@@ -74,9 +86,10 @@ public class PostController {
             @RequestParam double lat,
             @RequestParam double lng,
             @RequestParam double radiusMeters,
-            @RequestParam(defaultValue = "10") int topN
+            @RequestParam(defaultValue = "10") int topN,
+            HttpServletRequest request
     ) {
-        Long userId = currentUserId();
+        Long userId = getCurrentUserId(request);
         
         // 1) AI 추천으로 Post ID 목록 가져오기
         List<Long> recommendedIds = recommendService.recommend(userId, lat, lng, radiusMeters, topN);
@@ -96,9 +109,12 @@ public class PostController {
         return ResponseEntity.ok(result);
     }
 
-    private Long currentUserId() {
-        // JWT/세션 등에서 실제 유저 ID 가져오도록 바꾸기
-        return 1L;
+    private Long getCurrentUserId(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            throw new IllegalArgumentException("인증 정보를 찾을 수 없습니다.");
+        }
+        return userId;
     }
 
 }
