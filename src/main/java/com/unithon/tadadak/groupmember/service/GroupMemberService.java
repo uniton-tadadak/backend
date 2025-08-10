@@ -14,6 +14,7 @@ import com.unithon.tadadak.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,6 +28,7 @@ public class GroupMemberService {
     private final GroupsRepository groupsRepository;
     private final UserRepository userRepository;
 
+    @Transactional
     public GroupMemberResponse joinGroup(GroupMemberRequest request) {
         // 그룹과 사용자 엔티티 조회
         Groups group = groupsRepository.findById(request.getGroupId())
@@ -39,6 +41,19 @@ public class GroupMemberService {
             throw new CustomException(ErrorCode.DUPLICATE_JOIN);
         }
         
+        // 🆕 그룹 참여 가능 여부 확인
+        if (!group.canJoin()) {
+            if (group.isFull()) {
+                log.warn("그룹 {} 정원 초과: 현재 {}/{} 명", 
+                    group.getGroupId(), group.getCurrentMemberCount(), group.getMaxMemberCount());
+                throw new CustomException(ErrorCode.GROUP_FULL);
+            } else {
+                log.warn("그룹 {} 참여 불가능한 상태: {}", group.getGroupId(), group.getStatus());
+                throw new CustomException(ErrorCode.INVALID_REQUEST);
+            }
+        }
+        
+        // 그룹 멤버 생성
         GroupMember member = GroupMember.builder()
                 .group(group)
                 .user(user)
@@ -46,18 +61,40 @@ public class GroupMemberService {
                 .paymentStatus(request.getPaymentStatus())
                 .build();
         
-        return GroupMemberResponse.from(repository.save(member));
+        GroupMember savedMember = repository.save(member);
+        
+        // 🆕 그룹 현재 인원수 증가
+        group.incrementMemberCount();
+        groupsRepository.save(group);
+        
+        log.info("사용자 {}가 그룹 {}에 참여 완료. 현재 인원: {}/{}", 
+            user.getUserId(), group.getGroupId(), 
+            group.getCurrentMemberCount(), group.getMaxMemberCount());
+        
+        return GroupMemberResponse.from(savedMember);
     }
 
+    @Transactional
     public void leaveGroup(Long groupId, Long userId) {
-        // 복합키로 직접 삭제
+        // 그룹 멤버 존재 여부 확인
         GroupMemberId id = new GroupMemberId(groupId, userId);
         if (!repository.existsById(id)) {
             throw new CustomException(ErrorCode.NOT_FOUND);
         }
+        
+        // 그룹 조회
+        Groups group = groupsRepository.findById(groupId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GROUP_NOT_FOUND));
+        
+        // 그룹 멤버 삭제
         repository.deleteById(id);
         
-        log.info("User {} left group {}", userId, groupId);
+        // 🆕 그룹 현재 인원수 감소
+        group.decrementMemberCount();
+        groupsRepository.save(group);
+        
+        log.info("사용자 {}가 그룹 {}에서 나감. 현재 인원: {}/{}", 
+            userId, groupId, group.getCurrentMemberCount(), group.getMaxMemberCount());
     }
 
     /**

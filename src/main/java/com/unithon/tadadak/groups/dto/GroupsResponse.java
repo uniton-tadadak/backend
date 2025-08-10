@@ -15,6 +15,11 @@ public class GroupsResponse {
     private int currentMemberCount;
     private String status;
     private LocalDateTime createdAt;
+    
+    // 편의 필드들 (프론트엔드에서 바로 사용 가능)
+    private boolean isFull;
+    private boolean canJoin;
+    private int availableSlots;
 
     public static GroupsResponse from(Groups groups) {
         return GroupsResponse.builder()
@@ -24,6 +29,10 @@ public class GroupsResponse {
                 .currentMemberCount(groups.getCurrentMemberCount())
                 .status(groups.getStatus())
                 .createdAt(groups.getCreatedAt())
+                // 🆕 편의 필드들 추가
+                .isFull(groups.isFull())
+                .canJoin(groups.canJoin())
+                .availableSlots(groups.getAvailableSlots())
                 .build();
     }
 }

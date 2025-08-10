@@ -60,4 +60,29 @@ public class Groups {
         this.createdAt = LocalDateTime.now();
         if (this.status == null) this.status = "WAITING";
     }
+
+    /**
+     * 그룹 인원 관리 메서드들
+     */
+    public boolean isFull() {
+        return this.currentMemberCount >= this.maxMemberCount;
+    }
+
+    public boolean canJoin() {
+        return this.currentMemberCount < this.maxMemberCount && "WAITING".equals(this.status);
+    }
+
+    public void incrementMemberCount() {
+        this.currentMemberCount++;
+    }
+
+    public void decrementMemberCount() {
+        if (this.currentMemberCount > 0) {
+            this.currentMemberCount--;
+        }
+    }
+
+    public int getAvailableSlots() {
+        return this.maxMemberCount - this.currentMemberCount;
+    }
 }

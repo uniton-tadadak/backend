@@ -15,6 +15,7 @@ import com.unithon.tadadak.groups.repository.GroupsRepository;
 import com.unithon.tadadak.groupmember.domain.GroupMember;
 import com.unithon.tadadak.groupmember.domain.PaymentStatus;
 import com.unithon.tadadak.groupmember.repository.GroupMemberRepository;
+import com.unithon.tadadak.chatroom.service.ChatRoomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class PostService {
     private final LocationService locationService;
     private final GroupsRepository groupsRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final ChatRoomService chatRoomService;
 
     @Transactional
     public Post createPost(PostRequestDto dto) {
@@ -77,7 +79,15 @@ public class PostService {
         // 4) Post 엔티티에 생성된 group 추가 (JPA 연관관계 동기화)
         post.getGroups().add(group);
         
-        log.info("Post {} 생성 완료 → Groups {} 생성 → Host {} 자동 참여", 
+        // 5) Firestore 채팅방 생성 (비동기적으로 처리)
+        try {
+            chatRoomService.createRoomForPost(post.getPostId(), host.getUserId());
+        } catch (Exception e) {
+            log.error("채팅방 생성 실패 (Post {}): {}", post.getPostId(), e.getMessage());
+            // 채팅방 생성 실패해도 Post 생성은 성공으로 처리
+        }
+        
+        log.info("Post {} 생성 완료 → Groups {} 생성 → Host {} 자동 참여 → 채팅방 생성", 
                 post.getPostId(), group.getGroupId(), host.getUserId());
         
         return post;
@@ -213,7 +223,15 @@ public class PostService {
         // 8) Post 엔티티에 생성된 group 추가 (JPA 연관관계 동기화)
         post.getGroups().add(group);
         
-        log.info("Created post {} with new locations (start: {}, end: {}) → Groups {} → Host {} auto-joined", 
+        // 9) Firestore 채팅방 생성 (비동기적으로 처리)
+        try {
+            chatRoomService.createRoomForPost(post.getPostId(), host.getUserId());
+        } catch (Exception e) {
+            log.error("채팅방 생성 실패 (Post {}): {}", post.getPostId(), e.getMessage());
+            // 채팅방 생성 실패해도 Post 생성은 성공으로 처리
+        }
+        
+        log.info("Created post {} with new locations (start: {}, end: {}) → Groups {} → Host {} auto-joined → 채팅방 생성", 
                 post.getPostId(), startLocation.getLocationId(), endLocation.getLocationId(),
                 group.getGroupId(), host.getUserId());
         

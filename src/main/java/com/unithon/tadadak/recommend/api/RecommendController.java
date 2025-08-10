@@ -1,6 +1,7 @@
 package com.unithon.tadadak.recommend.api;
 
 import com.unithon.tadadak.recommend.service.RecommendService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,9 +24,10 @@ public class RecommendController {
             @RequestParam double destLat,  // 도착지 위도
             @RequestParam double destLng,  // 도착지 경도
             @RequestParam(defaultValue = "1000") double radius, // 허용 반경(미터)
-            @RequestParam(defaultValue = "10") int topN
+            @RequestParam(defaultValue = "10") int topN,
+            HttpServletRequest request
     ) {
-        Long userId = currentUserId();
+        Long userId = getCurrentUserId(request);
         return recommendService.recommendByRoute(userId, depLat, depLng, destLat, destLng, radius, topN);
     }
     
@@ -37,23 +39,27 @@ public class RecommendController {
             @RequestParam double lat,
             @RequestParam double lng,
             @RequestParam double radiusMeters,
-            @RequestParam(defaultValue = "10") int topN
+            @RequestParam(defaultValue = "10") int topN,
+            HttpServletRequest request
     ) {
-        Long userId = currentUserId();
+        Long userId = getCurrentUserId(request);
         return recommendService.recommend(userId, lat, lng, radiusMeters, topN);
     }
 
     /**
-     * 📝 새로 추가: 사용자 추천 통계 조회
+     * 📝 사용자 추천 통계 조회
      */
     @GetMapping("/stats")
-    public RecommendService.RecommendStatsDto getRecommendStats() {
-        Long userId = currentUserId();
+    public RecommendService.RecommendStatsDto getRecommendStats(HttpServletRequest request) {
+        Long userId = getCurrentUserId(request);
         return recommendService.getUserRecommendStats(userId);
     }
 
-    private Long currentUserId() {
-        // JWT/세션 등에서 실제 유저 ID 가져오도록 바꾸기
-        return 7L; // 📝 새로 생성한 사용자 ID (응답에서 확인 후 수정)
+    private Long getCurrentUserId(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            throw new IllegalArgumentException("인증 정보를 찾을 수 없습니다.");
+        }
+        return userId;
     }
 } 

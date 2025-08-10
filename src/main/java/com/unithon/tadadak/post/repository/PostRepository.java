@@ -10,26 +10,7 @@ import java.util.Optional;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
 
-    @Query("""
-        SELECT p
-          FROM Post p
-          JOIN p.startLocation sl
-          JOIN p.endLocation   el
-         WHERE sl.latitude  BETWEEN :depMinLat AND :depMaxLat
-           AND sl.longitude BETWEEN :depMinLng AND :depMaxLng
-           AND el.latitude  BETWEEN :destMinLat AND :destMaxLat
-           AND el.longitude BETWEEN :destMinLng AND :destMaxLng
-    """)
-    List<Post> findAllInIntersection(
-            @Param("depMinLat")  double depMinLat,
-            @Param("depMaxLat")  double depMaxLat,
-            @Param("depMinLng")  double depMinLng,
-            @Param("depMaxLng")  double depMaxLng,
-            @Param("destMinLat") double destMinLat,
-            @Param("destMaxLat") double destMaxLat,
-            @Param("destMinLng") double destMinLng,
-            @Param("destMaxLng") double destMaxLng
-    );
+
 
     @Query(value = """
         SELECT 
