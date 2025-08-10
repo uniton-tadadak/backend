@@ -1,39 +1,39 @@
 package com.unithon.tadadak.global.exception;
 
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDateTime;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(CustomException.class)
-    public ResponseEntity<ErrorResponse> handleCustom(CustomException ex, HttpServletRequest req) {
-        ErrorCode code = ex.getErrorCode();
-        return ResponseEntity
-                .status(code.getStatus())
-                .body(ErrorResponse.builder()
-                        .timestamp(LocalDateTime.now())
-                        .status(code.getStatus().value())
-                        .error(code.name())
-                        .message(code.getMessage())
-                        .path(req.getRequestURI())
-                        .build());
+    public ResponseEntity<ErrorResponse> handleCustomException(CustomException ex) {
+        ErrorCode errorCode = ex.getErrorCode();
+        ErrorResponse response = new ErrorResponse(errorCode);
+        return new ResponseEntity<>(response, errorCode.getStatus());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+        ErrorResponse response = new ErrorResponse(
+                ErrorCode.INVALID_INPUT_VALUE.getStatus().value(),
+                ex.getBindingResult().getFieldErrors().stream()
+                        .findFirst()
+                        .map(e -> e.getField() + ": " + e.getDefaultMessage())
+                        .orElse(ErrorCode.INVALID_INPUT_VALUE.getMessage())
+        );
+        return new ResponseEntity<>(response, ErrorCode.INVALID_INPUT_VALUE.getStatus());
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleEtc(Exception ex, HttpServletRequest req) {
-        return ResponseEntity
-                .status(500)
-                .body(ErrorResponse.builder()
-                        .timestamp(LocalDateTime.now())
-                        .status(500)
-                        .error("INTERNAL_SERVER_ERROR")
-                        .message(ex.getMessage())
-                        .path(req.getRequestURI())
-                        .build());
+    public ResponseEntity<ErrorResponse> handleException(Exception ex) {
+        ErrorResponse response = new ErrorResponse(
+                ErrorCode.INVALID_INPUT_VALUE.getStatus().value(),
+                ErrorCode.INVALID_INPUT_VALUE.getMessage()
+        );
+        return new ResponseEntity<>(response, ErrorCode.INVALID_INPUT_VALUE.getStatus());
     }
 }
 

@@ -10,8 +10,11 @@ import java.util.Optional;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 3718bf4 (bill 도메인 추가 + post 도메인 수정)
     @Query(value = """
         SELECT 
             p.post_id       AS postId,
