@@ -32,6 +32,7 @@ public class Post {
 
     private Integer desiredMembers;
     private Integer estimatedPrice;
+    private Integer estimatePricePerMember;
     private LocalDateTime departureTime;
     private String status; // OPEN, CLOSED, EXPIRED
     private LocalDateTime createdAt;
