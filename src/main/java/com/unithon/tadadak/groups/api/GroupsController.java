@@ -18,6 +18,15 @@ public class GroupsController {
 
     private final GroupsService groupsService;
 
+    @GetMapping("/post/{postId}")
+    public GroupsResponse getGroupByPostId(@PathVariable Long postId, HttpServletRequest request) {
+        // JWT에서 사용자 정보 추출
+        Long userId = getCurrentUserId(request);
+        System.out.println("🔍 API 호출: Post ID " + postId + "로 Group 조회");
+        return groupsService.getGroupByPostId(postId);
+    }
+
+
     @PostMapping
     public GroupsResponse createGroup(@RequestBody GroupsRequest request, HttpServletRequest httpRequest) {
         // JWT에서 사용자 정보 추출

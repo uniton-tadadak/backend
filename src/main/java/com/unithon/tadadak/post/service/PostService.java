@@ -52,6 +52,7 @@ public class PostService {
                         .endLocation(locationRepository.findById(dto.getEndLocationId()).orElseThrow())
                         .desiredMembers(dto.getDesiredMembers())
                         .estimatedPrice(dto.getEstimatedPrice())
+                        .estimatePricePerMember(dto.getEstimatedPrice())
                         .departureTime(dto.getDepartureTime())
                         .EndAddress(dto.getEndAddress())
                         .StartAddress(dto.getStartAddress())
@@ -98,58 +99,74 @@ public class PostService {
         return post;
     }
 
-    public List<PostResponseDto> getPostsInIntersection(DualBoundingBoxRequestDto boxes) {
-        var b1 = boxes.getDepartureBox();
-        var b2 = boxes.getDestinationBox();
-        
-        // 📝 변경: fetch join 쿼리 사용으로 N+1 문제 방지
-        List<Post> list = postRepository.findAllInIntersectionWithDetails(
-                b1.getMinLat(), b1.getMaxLat(), b1.getMinLng(), b1.getMaxLng(),
-                b2.getMinLat(), b2.getMaxLat(), b2.getMinLng(), b2.getMaxLng()
-        );
-        
-        log.info("Found {} posts in intersection", list.size());
-        return list.stream().map(PostResponseDto::fromEntity).toList();
-    }
+//    public List<PostResponseDto> getPostsInIntersection(DualBoundingBoxRequestDto boxes) {
+//        var b1 = boxes.getDepartureBox();
+//        var b2 = boxes.getDestinationBox();
+//
+//        // 📝 변경: fetch join 쿼리 사용으로 N+1 문제 방지
+//        List<Post> list = postRepository.findAllInIntersectionWithDetails(
+//                b1.getMinLat(), b1.getMaxLat(), b1.getMinLng(), b1.getMaxLng(),
+//                b2.getMinLat(), b2.getMaxLat(), b2.getMinLng(), b2.getMaxLng()
+//        );
+//
+//        log.info("Found {} posts in intersection", list.size());
+//        return list.stream().map(PostResponseDto::fromEntity).toList();
+//    }
 
+
+    public List<PostResponseDto> getPostsByIds(List<Long> postIds) {
+        return getPostsByIds(postIds, false);
+    }
     /**
      * 추천된 Post ID 목록을 받아서 실제 Post 상세정보로 변환
      * (추천 순서 유지)
      */
-    public List<PostResponseDto> getPostsByIds(List<Long> postIds) {
+// 추천 전용: host 포함해서 나누기 (currentMembers + 1)
+    public List<PostResponseDto> getPostsByIds(List<Long> postIds, boolean includeHostInEstimate) {
         if (postIds == null || postIds.isEmpty()) return List.of();
 
         // 1) 한 번에 모두 로드 (fetch join)
         List<Post> posts = postRepository.findAllByIdWithDetails(postIds);
 
-        // 2) ID→Post 매핑 (중복 안전, 첫 값 유지)
+        // 2) ID → Post 매핑
         Map<Long, Post> byId = posts.stream()
                 .collect(Collectors.toMap(
-                        Post::getPostId,      // key: postId
-                        post -> post,         // value: post 객체 자체
-                        (a, b) -> a           // key 충돌 시 첫 번째 값 유지
+                        Post::getPostId,
+                        post -> post,
+                        (a, b) -> a
                 ));
 
-        // 3) 추천 순서 보존하며 DTO 변환 (O(n))
+        // 3) 추천 순서 보존 + DTO 변환 (+ 필요 시 per-member 재계산)
         return postIds.stream()
-                .map(byId::get)                // O(1) 조회
+                .map(byId::get)
                 .filter(Objects::nonNull)
-                .map(PostResponseDto::fromEntity)
+                .map(post -> {
+                    PostResponseDto dto = PostResponseDto.fromEntity(post); // 기본 변환
+                    if (includeHostInEstimate) {
+                        Integer estimated = dto.getEstimatedPrice();
+                        Integer current = dto.getCurrentMembers();
+                        int safeCurrent = (current != null ? current : 0);
+                        int divisor = safeCurrent + 1; // host 포함
+                        int perMember = (estimated != null && divisor > 0) ? (estimated / divisor) : 0;
+                        dto.setEstimatePricePerMember(perMember);
+                    }
+                    return dto;
+                })
                 .toList();
     }
 
     /**
      * Post ID로 단일 조회
      */
-    public PostResponseDto getPostById(Long postId) {
-        // 📝 변경: fetch join 쿼리 사용으로 N+1 문제 방지
-        return postRepository.findByIdWithDetails(postId)
-                .map(dto -> {
-                    log.info("Found post {} with details", postId);
-                    return PostResponseDto.fromEntity(dto);
-                })
-                .orElse(null);
-    }
+//    public PostResponseDto getPostById(Long postId) {
+//        // 📝 변경: fetch join 쿼리 사용으로 N+1 문제 방지
+//        return postRepository.findByIdWithDetails(postId)
+//                .map(dto -> {
+//                    log.info("Found post {} with details", postId);
+//                    return PostResponseDto.fromEntity(dto);
+//                })
+//                .orElse(null);
+//    }
 
     /**
      * 📝 새로 추가: 참여 가능한 활성 Post들 조회

@@ -14,8 +14,13 @@ public interface GroupsRepository extends JpaRepository<Groups, Long> {
      * Post ID로 해당하는 그룹 조회
      */
     @Query("SELECT g FROM Groups g WHERE g.post.postId = :postId")
-    Optional<Groups> findByPostId(@Param("postId") Long postId);
-    
+    Optional<Groups> findFirstByPostId(@Param("postId") Long postId);
+
+    /**
+     * Post ID로 해당하는 모든 그룹 조회
+     */
+    @Query("SELECT g FROM Groups g WHERE g.post.postId = :postId")
+    List<Groups> findAllByPostId(@Param("postId") Long postId);
     /**
      * 정원이 차지 않은 활성 그룹들 조회
      */

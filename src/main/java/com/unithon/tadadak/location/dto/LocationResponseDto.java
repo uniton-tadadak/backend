@@ -10,8 +10,8 @@ public class LocationResponseDto {
     private Long locationId;
     private Double latitude;
     private Double longitude;
-    private Long userId;     // nullable
-    private Long postId;     // nullable  
+//    private Long userId;     // nullable
+//    private Long postId;     // nullable
     private LocalDateTime createdAt;
 
     public static LocationResponseDto from(Location location) {
@@ -19,8 +19,8 @@ public class LocationResponseDto {
                 .locationId(location.getLocationId())
                 .latitude(location.getLatitude())
                 .longitude(location.getLongitude())
-                .userId(location.getUser() != null ? location.getUser().getUserId() : null)
-                .postId(location.getPostId())
+//                .userId(location.getUser() != null ? location.getUser().getUserId() : null)
+//                .postId(location.getPostId())
                 .createdAt(location.getCreatedAt())
                 .build();
     }

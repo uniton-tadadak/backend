@@ -1,9 +1,16 @@
 package com.unithon.tadadak.groupmember.api;
 
+import com.unithon.tadadak.global.exception.CustomException;
+import com.unithon.tadadak.global.exception.ErrorCode;
 import com.unithon.tadadak.groupmember.domain.GroupMember;
+import com.unithon.tadadak.groupmember.dto.GroupChangeResponse;
 import com.unithon.tadadak.groupmember.dto.GroupMemberRequest;
 import com.unithon.tadadak.groupmember.dto.GroupMemberResponse;
 import com.unithon.tadadak.groupmember.service.GroupMemberService;
+import com.unithon.tadadak.groups.domain.Groups;
+import com.unithon.tadadak.groups.repository.GroupsRepository;
+import com.unithon.tadadak.post.domain.Post;
+import com.unithon.tadadak.post.repository.PostRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,25 +24,67 @@ import java.util.List;
 public class GroupMemberController {
 
     private final GroupMemberService service;
+    private final GroupsRepository groupsRepository;   // 🆕 추가
+    private final PostRepository postRepository;       // 🆕 추가
 
     @PostMapping
-    public GroupMemberResponse joinGroup(@RequestBody GroupMemberRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<GroupChangeResponse> joinGroup(
+            @RequestBody GroupMemberRequest request,
+            HttpServletRequest httpRequest
+    ) {
         // JWT에서 사용자 정보 추출하여 요청에 설정
         Long userId = getCurrentUserId(httpRequest);
-        request.setUserId(userId);  // 🆕 JWT에서 추출한 userId로 강제 설정
-        
-        return service.joinGroup(request);
+        request.setUserId(userId);
+
+        // 서비스 내부에서: 인원 +1, perMember 재계산
+        GroupMemberResponse res = service.joinGroup(request);
+
+        // 갱신된 그룹/포스트 재조회
+        Groups group = groupsRepository.findById(request.getGroupId())
+                .orElseThrow(() -> new CustomException(ErrorCode.GROUP_NOT_FOUND));
+        Post post = postRepository.findById(group.getPost().getPostId())
+                .orElseThrow(() -> new CustomException(ErrorCode.POST_NOT_FOUND));
+
+        GroupChangeResponse body = GroupChangeResponse.builder()
+                .postId(post.getPostId())
+                .groupId(group.getGroupId())
+                .currentMembers(group.getCurrentMemberCount())
+                .estimatedPrice(post.getEstimatedPrice())
+                .estimatePricePerMember(post.getEstimatePricePerMember())
+                .build();
+
+        return ResponseEntity.ok(body);
     }
 
-
-
-    // 관리자용 멤버 제거 (필요시)
+    // 관리자/호스트용 멤버 제거 (필요시)
     @DeleteMapping("/{groupId}/{userId}")
-    public void removeGroupMember(@PathVariable Long groupId, @PathVariable Long userId, HttpServletRequest request) {
-        // JWT에서 호스트 정보 추출하여 권한 체크
+    public ResponseEntity<GroupChangeResponse> removeGroupMember(
+            @PathVariable Long groupId,
+            @PathVariable Long userId,
+            HttpServletRequest request
+    ) {
+        // JWT에서 호스트 정보 추출하여 권한 체크(필요 시 추가)
         Long hostUserId = getCurrentUserId(request);
-        // 호스트 권한 체크 로직 추가 필요
+        // TODO: hostUserId가 해당 그룹의 호스트인지 검증 로직 추가
+
+        // 서비스 내부에서: 인원 -1, perMember 재계산
         service.leaveGroup(groupId, userId);
+
+        // 갱신된 그룹/포스트 재조회
+        Groups group = groupsRepository.findById(groupId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GROUP_NOT_FOUND));
+        Post post = postRepository.findById(group.getPost().getPostId())
+                .orElseThrow(() -> new CustomException(ErrorCode.POST_NOT_FOUND));
+
+        GroupChangeResponse body = GroupChangeResponse.builder()
+                .postId(post.getPostId())
+                .groupId(group.getGroupId())
+                .currentMembers(group.getCurrentMemberCount())
+                .estimatedPrice(post.getEstimatedPrice())
+                .estimatePricePerMember(post.getEstimatePricePerMember())
+                .build();
+
+        return ResponseEntity.ok(body);
     }
 
 

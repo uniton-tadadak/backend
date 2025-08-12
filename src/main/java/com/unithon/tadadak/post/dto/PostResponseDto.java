@@ -56,7 +56,7 @@ public class PostResponseDto {
 
         int estimated = post.getEstimatedPrice() != null ? post.getEstimatedPrice() : 0;
         Integer curMembers = (firstGroup != null) ? firstGroup.getCurrentMemberCount() : null;
-        int currentMembers = (curMembers != null) ? curMembers : 0;
+        int currentMembers = (curMembers != null) ? curMembers : 1;
         int estimatePerMember = currentMembers > 0 ? (estimated / currentMembers) : 0;
 
         return PostResponseDto.builder()

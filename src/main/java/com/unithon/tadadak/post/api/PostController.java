@@ -31,11 +31,10 @@ public class PostController {
         // 2) 서비스로 저장 (lat/lng 등 엔티티 필드만 영속)
         Post post = postService.createPost(dto);
 
-        // 3) 주소/기간은 DB에 저장하지 않고, 클라이언트에서 들어온 값을 그대로 응답에 실어준다
         PostResponseDto res = PostResponseDto.fromEntity(
                 post,
-                dto.getStartAddress(),  // 🔴 클라 → 응답 에코
-                dto.getEndAddress(),    // 🔴 클라 → 응답 에코
+                dto.getStartAddress(),
+                dto.getEndAddress(),
                 dto.getDuration()       // 🔴 int(분/초 팀 규약대로) 그대로 에코
         );
 
@@ -105,7 +104,8 @@ public class PostController {
         List<Long> ranked = recommendService.recommendByBoxes(userId, boxes, topN, includeJoined, includePast);
 
         // 2) 정렬된 ID → 상세 DTO (추천 순서 유지)
-        var dtos = postService.getPostsByIds(ranked);
+        var dtos = postService.getPostsByIds(ranked, true);
+        //var dtos = postService.getPostsByIds(ranked);
 
         // 3) rooms 래핑해서 반환
         return ResponseEntity.ok(new RoomsResponse(dtos));

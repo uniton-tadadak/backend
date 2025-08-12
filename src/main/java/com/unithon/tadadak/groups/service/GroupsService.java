@@ -24,6 +24,29 @@ public class GroupsService {
     private final GroupsRepository groupsRepository;
     private final PostRepository postRepository;
 
+    public GroupsResponse getGroupByPostId(Long postId) {
+        log.info("🔍 Post ID로 Group 조회 시도: {}", postId);
+
+        try {
+            List<Groups> groups = groupsRepository.findAllByPostId(postId);
+            log.info("🔍 조회된 Group 개수: {}", groups.size());
+
+            if (groups.isEmpty()) {
+                throw new CustomException(ErrorCode.GROUP_NOT_FOUND);
+            }
+
+            // 첫 번째 Group 사용
+            Groups firstGroup = groups.get(0);
+            GroupsResponse result = GroupsResponse.from(firstGroup);
+
+            log.info("✅ Group 조회 성공: {}", result);
+            return result;
+        } catch (Exception e) {
+            log.error("❌ Group 조회 실패: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
     public GroupsResponse createGroup(GroupsRequest request) {
         // Post 엔티티 조회
         Post post = postRepository.findById(request.getPostId())
