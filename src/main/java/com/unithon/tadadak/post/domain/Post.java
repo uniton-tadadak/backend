@@ -36,6 +36,11 @@ public class Post {
     private LocalDateTime departureTime;
     private String status; // OPEN, CLOSED, EXPIRED
     private LocalDateTime createdAt;
+    private String StartAddress;
+    private String EndAddress;
+
+    @Column(name = "duration_seconds")
+    private Integer duration;
 
     // === 연관관계 매핑 ===
 

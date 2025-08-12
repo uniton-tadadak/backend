@@ -1,18 +1,17 @@
 package com.unithon.tadadak.bill.api;
 
+import com.unithon.tadadak.bill.domain.Bill;
 import com.unithon.tadadak.bill.domain.BillStatus;
 import com.unithon.tadadak.bill.dto.BillResponse;
 import com.unithon.tadadak.bill.dto.CreateBillRequest;
 import com.unithon.tadadak.bill.dto.UpdateBillRequest;
 import com.unithon.tadadak.bill.dto.UpdateBillStatusRequest;
 import com.unithon.tadadak.bill.service.BillService;
-<<<<<<< HEAD
 import jakarta.servlet.http.HttpServletRequest;
-=======
 import jakarta.validation.Valid;
->>>>>>> 3718bf4 (bill 도메인 추가 + post 도메인 수정)
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -23,15 +22,6 @@ public class BillController {
     private final BillService billService;
 
     @PostMapping
-<<<<<<< HEAD
-    public ResponseEntity<BillResponseDto> create(@RequestBody BillRequestDto dto, HttpServletRequest request) {
-        // JWT에서 사용자 정보 추출
-        Long userId = getCurrentUserId(request);
-        // dto에 userId 설정 (필요시)
-        
-        Bill bill = billService.create(dto);
-        return ResponseEntity.ok(BillResponseDto.from(bill));
-=======
     public BillResponse create(@RequestBody @Valid CreateBillRequest req) {
         return billService.create(req);
     }
@@ -67,15 +57,6 @@ public class BillController {
     @DeleteMapping("/{billId}")
     public void delete(@PathVariable Long billId) {
         billService.delete(billId);
->>>>>>> 3718bf4 (bill 도메인 추가 + post 도메인 수정)
-    }
-
-    private Long getCurrentUserId(HttpServletRequest request) {
-        Long userId = (Long) request.getAttribute("userId");
-        if (userId == null) {
-            throw new IllegalArgumentException("인증 정보를 찾을 수 없습니다.");
-        }
-        return userId;
     }
 }
 

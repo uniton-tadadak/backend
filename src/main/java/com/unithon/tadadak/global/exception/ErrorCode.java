@@ -22,6 +22,7 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다"),
     
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다"),
+    HOST_CANNOT_LEAVE(HttpStatus.BAD_REQUEST, "호스트는 그룹을 나갈 수 없습니다. 그룹을 삭제해주세요."),
 
     // 공통
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "잘못된 입력 값입니다."),

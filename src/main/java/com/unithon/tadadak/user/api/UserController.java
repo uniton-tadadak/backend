@@ -20,11 +20,17 @@ public class UserController {
     public LoginResponse createUser(@RequestBody UserRequest request) {
         return userService.createUser(request);
     }
-    
+
     // 회원 가입 (별칭)
     @PostMapping("/signup")
     public LoginResponse signup(@RequestBody UserRequest request) {
         return userService.createUser(request);
+    }
+
+    // 로그인
+    @PostMapping("/login")
+    public UserResponse login(@RequestBody UserRequest request) {
+        return userService.login(request.getUsername(), request.getPassword());
     }
 
     // 단일 회원 조회 (자신의 정보만 조회 가능)
@@ -90,9 +96,9 @@ public class UserController {
         if (userId == null) {
             throw new IllegalArgumentException("인증 정보를 찾을 수 없습니다.");
         }
-        return userService.updateUserWeights(userId, 
-                request.getMoneyWeight(), 
-                request.getDistanceWeight(), 
+        return userService.updateUserWeights(userId,
+                request.getMoneyWeight(),
+                request.getDistanceWeight(),
                 request.getTrustWeight());
     }
 
@@ -101,9 +107,9 @@ public class UserController {
     public UserResponse updateUserWeights(
             @PathVariable Long id,
             @RequestBody WeightUpdateRequest request) {
-        return userService.updateUserWeights(id, 
-                request.getMoneyWeight(), 
-                request.getDistanceWeight(), 
+        return userService.updateUserWeights(id,
+                request.getMoneyWeight(),
+                request.getDistanceWeight(),
                 request.getTrustWeight());
     }
 

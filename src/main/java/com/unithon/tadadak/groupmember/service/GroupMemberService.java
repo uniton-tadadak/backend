@@ -78,24 +78,30 @@ public class GroupMemberService {
     public void leaveGroup(Long groupId, Long userId) {
         // 그룹 멤버 존재 여부 확인
         GroupMemberId id = new GroupMemberId(groupId, userId);
-        if (!repository.existsById(id)) {
-            throw new CustomException(ErrorCode.NOT_FOUND);
-        }
-        
+        GroupMember member = repository.findById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+
         // 그룹 조회
         Groups group = groupsRepository.findById(groupId)
                 .orElseThrow(() -> new CustomException(ErrorCode.GROUP_NOT_FOUND));
-        
+
+        // 🆕 호스트는 그룹을 나갈 수 없음 (그룹을 삭제해야 함)
+        if (member.isHost()) {
+            log.warn("호스트 {}가 그룹 {}에서 나가려고 시도", userId, groupId);
+            throw new CustomException(ErrorCode.HOST_CANNOT_LEAVE);
+        }
+
         // 그룹 멤버 삭제
         repository.deleteById(id);
-        
+
         // 🆕 그룹 현재 인원수 감소
         group.decrementMemberCount();
         groupsRepository.save(group);
-        
-        log.info("사용자 {}가 그룹 {}에서 나감. 현재 인원: {}/{}", 
-            userId, groupId, group.getCurrentMemberCount(), group.getMaxMemberCount());
+
+        log.info("사용자 {}가 그룹 {}에서 나감. 현재 인원: {}/{}",
+                userId, groupId, group.getCurrentMemberCount(), group.getMaxMemberCount());
     }
+
 
     /**
      * 📝 새로 추가: 특정 그룹의 모든 멤버 조회

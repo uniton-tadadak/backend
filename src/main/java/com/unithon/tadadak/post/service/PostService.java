@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -51,6 +53,9 @@ public class PostService {
                         .desiredMembers(dto.getDesiredMembers())
                         .estimatedPrice(dto.getEstimatedPrice())
                         .departureTime(dto.getDepartureTime())
+                        .EndAddress(dto.getEndAddress())
+                        .StartAddress(dto.getStartAddress())
+                        .duration(dto.getDuration())
                         .status("OPEN")
                         .createdAt(LocalDateTime.now())
                         .build()
@@ -112,25 +117,25 @@ public class PostService {
      * (추천 순서 유지)
      */
     public List<PostResponseDto> getPostsByIds(List<Long> postIds) {
-        if (postIds == null || postIds.isEmpty()) {
-            return List.of();
-        }
-        
-        // 📝 변경: fetch join 쿼리 사용으로 N+1 문제 방지
+        if (postIds == null || postIds.isEmpty()) return List.of();
+
+        // 1) 한 번에 모두 로드 (fetch join)
         List<Post> posts = postRepository.findAllByIdWithDetails(postIds);
-        
-        // ID 순서 유지 (추천 순서대로)
-        List<PostResponseDto> result = postIds.stream()
-                .map(id -> posts.stream()
-                        .filter(post -> post.getPostId().equals(id))
-                        .findFirst()
-                        .map(PostResponseDto::fromEntity)
-                        .orElse(null))
-                .filter(dto -> dto != null)
+
+        // 2) ID→Post 매핑 (중복 안전, 첫 값 유지)
+        Map<Long, Post> byId = posts.stream()
+                .collect(Collectors.toMap(
+                        Post::getPostId,      // key: postId
+                        post -> post,         // value: post 객체 자체
+                        (a, b) -> a           // key 충돌 시 첫 번째 값 유지
+                ));
+
+        // 3) 추천 순서 보존하며 DTO 변환 (O(n))
+        return postIds.stream()
+                .map(byId::get)                // O(1) 조회
+                .filter(Objects::nonNull)
+                .map(PostResponseDto::fromEntity)
                 .toList();
-        
-        log.info("Converted {} post IDs to DTOs with details", result.size());
-        return result;
     }
 
     /**

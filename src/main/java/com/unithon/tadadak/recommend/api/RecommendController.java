@@ -17,19 +17,19 @@ public class RecommendController {
     /**
      * 📝 새로운 방식: 출발지+도착지 기반 추천 (권장)
      */
-    @GetMapping("/route")
-    public List<Long> recommendByRoute(
-            @RequestParam double depLat,   // 출발지 위도
-            @RequestParam double depLng,   // 출발지 경도
-            @RequestParam double destLat,  // 도착지 위도
-            @RequestParam double destLng,  // 도착지 경도
-            @RequestParam(defaultValue = "1000") double radius, // 허용 반경(미터)
-            @RequestParam(defaultValue = "10") int topN,
-            HttpServletRequest request
-    ) {
-        Long userId = getCurrentUserId(request);
-        return recommendService.recommendByRoute(userId, depLat, depLng, destLat, destLng, radius, topN);
-    }
+//    @GetMapping("/route")
+//    public List<Long> recommendByRoute(
+//            @RequestParam double depLat,   // 출발지 위도
+//            @RequestParam double depLng,   // 출발지 경도
+//            @RequestParam double destLat,  // 도착지 위도
+//            @RequestParam double destLng,  // 도착지 경도
+//            @RequestParam(defaultValue = "1000") double radius, // 허용 반경(미터)
+//            @RequestParam(defaultValue = "10") int topN,
+//            HttpServletRequest request
+//    ) {
+//        Long userId = getCurrentUserId(request);
+//        return recommendService.recommendByRoute(userId, depLat, depLng, destLat, destLng, radius, topN);
+//    }
     
     /**
      * 📝 기존 방식: 단일 좌표 기반 추천 (하위 호환성)

@@ -27,12 +27,7 @@ public class GroupMemberController {
         return service.joinGroup(request);
     }
 
-    @DeleteMapping("/{groupId}")
-    public void leaveGroup(@PathVariable Long groupId, HttpServletRequest request) {
-        // JWT에서 사용자 정보 추출하여 자신만 나갈 수 있도록
-        Long userId = getCurrentUserId(request);
-        service.leaveGroup(groupId, userId);
-    }
+
 
     // 관리자용 멤버 제거 (필요시)
     @DeleteMapping("/{groupId}/{userId}")
@@ -129,6 +124,26 @@ public class GroupMemberController {
         }
         return userId;
     }
+
+    @DeleteMapping("/{groupId}")
+    public ResponseEntity<String> leaveGroup(@PathVariable Long groupId, HttpServletRequest request) {
+        // JWT에서 사용자 정보 추출하여 자신만 나갈 수 있도록
+        Long userId = getCurrentUserId(request);
+        service.leaveGroup(groupId, userId);
+        return ResponseEntity.ok("그룹에서 성공적으로 나갔습니다.");
+    }
+
+    /**
+     * 📝 그룹 나가기 (별칭 - 더 명확한 URL)
+     */
+    @DeleteMapping("/{groupId}/leave")
+    public ResponseEntity<String> leaveGroupAlternative(@PathVariable Long groupId, HttpServletRequest request) {
+        // JWT에서 사용자 정보 추출하여 자신만 나갈 수 있도록
+        Long userId = getCurrentUserId(request);
+        service.leaveGroup(groupId, userId);
+        return ResponseEntity.ok("그룹에서 성공적으로 나갔습니다.");
+    }
+
 }
 
 

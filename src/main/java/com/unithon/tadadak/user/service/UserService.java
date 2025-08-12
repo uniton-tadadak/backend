@@ -29,6 +29,12 @@ public class UserService {
     // 회원 가입 (JWT 토큰 포함)
     public LoginResponse createUser(UserRequest request) {
         try {
+            // 비밀번호 필수 검증
+            if (request.getPassword() == null || request.getPassword().isBlank()) {
+                return LoginResponse.builder()
+                        .message("비밀번호는 필수입니다.")
+                        .build();
+            }
             // 사용자 이름 중복 확인
             if (userRepository.findByUsername(request.getUsername()).isPresent()) {
                 return LoginResponse.builder()
@@ -59,10 +65,12 @@ public class UserService {
                 if (com.google.firebase.FirebaseApp.getApps().isEmpty()) {
                     log.info("Firebase가 비활성화되어 있습니다. Firebase 토큰을 생성하지 않습니다.");
                 } else {
+                    log.info("Firebase가 활성화되어 있습니다. 커스텀 토큰을 생성합니다. userId: {}", savedUser.getUserId());
                     Map<String, Object> claims = new HashMap<>();
                     claims.put("appUserId", savedUser.getUserId().toString());
                     firebaseToken = FirebaseAuth.getInstance()
                             .createCustomToken(savedUser.getUserId().toString(), claims);
+                    log.info("Firebase 커스텀 토큰 생성 성공: {}", firebaseToken != null ? "성공" : "실패");
                 }
             } catch (Exception e) {
                 log.warn("Firebase 토큰 생성 실패 (회원가입): {}", e.getMessage());
@@ -120,7 +128,7 @@ public class UserService {
 
         user.updateInfo(request.getUsername(), request.getTrustScore(),
                 request.getPenaltyCount(), request.getPraiseCount());
-        
+
         // 가중치 업데이트
         user.updateWeights(request.getMoneyWeight(), request.getDistanceWeight(), request.getTrustWeight());
 
@@ -140,5 +148,48 @@ public class UserService {
     // 회원 탈퇴
     public void deleteUser(Long id) {
         userRepository.deleteById(id);
+    }
+
+    // 로그인
+    public UserResponse login(String username, String password) {
+        try {
+            // 사용자 조회
+            User user = userRepository.findByUsername(username)
+                    .orElse(null);
+
+            // 사용자 존재 여부 및 패스워드 확인
+            if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
+                return UserResponse.loginFailure("사용자명 또는 비밀번호가 올바르지 않습니다.");
+            }
+
+            // JWT 토큰 생성
+            String accessToken = jwtUtil.generateToken(user.getUsername(), user.getUserId());
+
+            // Firebase 커스텀 토큰 생성 (Firebase 활성화된 경우에만)
+            String firebaseToken = null;
+            try {
+                if (com.google.firebase.FirebaseApp.getApps().isEmpty()) {
+                    log.info("Firebase가 비활성화되어 있습니다. Firebase 토큰을 생성하지 않습니다.");
+                } else {
+                    log.info("Firebase가 활성화되어 있습니다. 커스텀 토큰을 생성합니다. userId: {}", user.getUserId());
+                    Map<String, Object> claims = new HashMap<>();
+                    claims.put("appUserId", user.getUserId().toString());
+                    firebaseToken = FirebaseAuth.getInstance()
+                            .createCustomToken(user.getUserId().toString(), claims);
+                    log.info("Firebase 커스텀 토큰 생성 성공: {}", firebaseToken != null ? "성공" : "실패");
+                }
+            } catch (Exception e) {
+                log.warn("Firebase 토큰 생성 실패 (로그인): {}", e.getMessage());
+                e.printStackTrace();
+            }
+
+            log.info("로그인 성공: username={}, userId={}", user.getUsername(), user.getUserId());
+
+            return UserResponse.loginSuccess(user, accessToken, firebaseToken);
+
+        } catch (Exception e) {
+            log.error("로그인 실패", e);
+            return UserResponse.loginFailure("로그인 중 오류가 발생했습니다.");
+        }
     }
 }

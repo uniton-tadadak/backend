@@ -26,18 +26,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, 
-                                   HttpServletResponse response, 
-                                   FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
 
         final String authorizationHeader = request.getHeader("Authorization");
         final String token = jwtUtil.extractTokenFromHeader(authorizationHeader);
+
+        // ✅ Preflight는 인증 처리 없이 통과
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         // 토큰이 없으면 다음 필터로 진행
         if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
+
+
 
         try {
             // 토큰 유효성 검증
@@ -53,18 +61,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .build();
 
                 // 인증 객체 생성
-                UsernamePasswordAuthenticationToken authentication = 
-                    new UsernamePasswordAuthenticationToken(
-                        userDetails, 
-                        null, 
-                        userDetails.getAuthorities());
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities());
 
                 // 추가 정보 설정 (userId를 나중에 사용할 수 있도록)
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                
+
                 // SecurityContext에 인증 정보 저장
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                
+
                 // request에 userId 저장 (컨트롤러에서 사용할 수 있도록)
                 request.setAttribute("userId", userId);
                 request.setAttribute("username", username);
@@ -82,12 +90,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        
+
         // 인증이 필요없는 경로들
-        return path.startsWith("/api/auth/login") ||
-               path.startsWith("/api/users") ||  // 회원가입 (UserController)
-               path.startsWith("/swagger-ui") ||
-               path.startsWith("/v3/api-docs") ||
-               path.startsWith("/api/users/check-username"); // 닉네임 중복확인
+
+        return path.equals("/api/auth/login") ||
+                path.equals("/api/users") ||              // POST 회원가입
+                path.equals("/api/users/signup") ||        // POST 회원가입 별칭
+                path.equals("/api/users/login") ||         // POST User 로그인
+                path.equals("/api/users/check-username") ||
+                path.startsWith("/swagger-ui") ||
+                path.startsWith("/v3/api-docs");
     }
-} 
+}

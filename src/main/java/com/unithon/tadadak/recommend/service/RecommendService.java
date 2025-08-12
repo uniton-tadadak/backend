@@ -1,6 +1,7 @@
 package com.unithon.tadadak.recommend.service;
 
 import com.unithon.tadadak.post.domain.Post;
+import com.unithon.tadadak.post.dto.DualBoundingBoxRequestDto;
 import com.unithon.tadadak.recommend.dto.Candidate;
 import com.unithon.tadadak.recommend.dto.RecommendRequest;
 import com.unithon.tadadak.recommend.infra.RecommendClient;
@@ -30,64 +31,125 @@ public class RecommendService {
     private final GroupMemberRepository groupMemberRepository;
     private final GroupsRepository groupsRepository;
 
-    /**
-     * 📝 새로운 방식: 출발지와 도착지를 모두 고려한 추천
-     */
-    public List<Long> recommendByRoute(Long userId, double depLat, double depLng, 
-                                      double destLat, double destLng, double radius, int topN) {
+    // RecommendService.java
+    public List<Long> recommendByBoxes(Long userId, DualBoundingBoxRequestDto boxes, int topN,
+                                       boolean includeJoined, boolean includePast) {
         try {
-            log.info("Route-based recommendation for user {} from ({}, {}) to ({}, {}) within {}m", 
-                    userId, depLat, depLng, destLat, destLng, radius);
-            
-            // 1) 사용자 조회
-            User user = userRepository.findById(userId)
+            // 0) 유효성 & 유저
+            if (userId == null || userId <= 0) throw new IllegalArgumentException("Invalid userId");
+            var user = userRepository.findById(userId)
                     .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
-            
-            // 2) 경계박스 생성 (출발지와 도착지 각각 반경 기반)
-            double[] depBox = createBoundingBox(depLat, depLng, radius);
-            double[] destBox = createBoundingBox(destLat, destLng, radius);
-            
-            // 3) 교집합 쿼리로 적절한 Post들 조회
-            List<Post> posts = postRepository.findAllInIntersectionWithDetails(
-                    depBox[0], depBox[1], depBox[2], depBox[3],    // 출발지 박스
-                    destBox[0], destBox[1], destBox[2], destBox[3] // 도착지 박스
+
+            var dep = boxes.getDepartureBox();
+            var dest = boxes.getDestinationBox();
+
+            // 1) 교집합 후보 조회 (fetch join으로 N+1 방지되는 레포 메서드)
+            var posts = postRepository.findAllInIntersectionWithDetails(
+                    dep.getMinLat(), dep.getMaxLat(), dep.getMinLng(), dep.getMaxLng(),
+                    dest.getMinLat(), dest.getMaxLat(), dest.getMinLng(), dest.getMaxLng()
             );
-            
-            // 4) 사용자가 이미 참여한 그룹 필터링
-            List<Post> filteredPosts = posts.stream()
-                    .filter(post -> !hasUserJoined(userId, post))
-                    .filter(post -> "OPEN".equals(post.getStatus()))
-                    .filter(post -> post.getDepartureTime().isAfter(java.time.LocalDateTime.now()))
+
+            // 2) 필터링 (옵션 적용)
+            var now = java.time.LocalDateTime.now();
+            var filtered = posts.stream()
+                    // 이미 참여한 그룹 포함 여부
+                    .filter(p -> includeJoined || !hasUserJoined(userId, p))
+                    // 상태 필터 (현재는 OPEN만 추천)
+                    .filter(p -> "OPEN".equals(p.getStatus()))
+                    // 과거 출발 포함 여부
+                    .filter(p -> includePast || (p.getDepartureTime() != null && p.getDepartureTime().isAfter(now)))
                     .toList();
-            
-            log.info("Found {} suitable posts for route-based recommendation", filteredPosts.size());
-            
-            if (filteredPosts.isEmpty()) {
-                return List.of();
-            }
-            
-            // 5) 거리와 신뢰도 계산하여 후보 생성 (도착지 정보 포함)
-            List<Candidate> candidates = filteredPosts.stream()
-                    .map(post -> createCandidate(post, depLat, depLng, destLat, destLng))
+            if (filtered.isEmpty()) return List.of();
+
+            // 3) 박스 중심점(대표 좌표) 계산
+            double userDepLat  = (dep.getMinLat()  + dep.getMaxLat())  / 2.0;
+            double userDepLng  = (dep.getMinLng()  + dep.getMaxLng())  / 2.0;
+            double userDestLat = (dest.getMinLat() + dest.getMaxLat()) / 2.0;
+            double userDestLng = (dest.getMinLng() + dest.getMaxLng()) / 2.0;
+
+            // 4) Candidate 생성 (출발+도착 거리 평균, 그룹신뢰도 포함)
+            var candidates = filtered.stream()
+                    .map(p -> createCandidate(p, userDepLat, userDepLng, userDestLat, userDestLng))
                     .toList();
-            
-            // 6) AI 호출
-            RecommendRequest request = new RecommendRequest(
+
+            // 5) AI 요청 본문 구성 (사용자 가중치 null 안전 처리)
+            var req = new RecommendRequest(
                     userId,
                     nullToZero(user.getMoneyWeight()),
-                    nullToZero(user.getDistanceWeight()), 
+                    nullToZero(user.getDistanceWeight()),
                     nullToZero(user.getTrustWeight()),
                     candidates,
-                    topN
+                    Math.min(topN, candidates.size())
             );
-            
-            return client.rank(request);
-            
+
+            // 6) AI 호출 → 정렬된 ID 반환 → 원본 후보에 존재하는 ID만 유지
+            var ranked = client.rank(req);
+            return validateRecommendations(ranked, candidates);
+
         } catch (Exception e) {
-            log.error("Route-based recommendation failed for user {}: {}", userId, e.getMessage(), e);
+            log.error("recommendByBoxes failed for user {}: {}", userId, e.getMessage(), e);
             return List.of();
         }
     }
+
+    /**
+     * 📝 새로운 방식: 출발지와 도착지를 모두 고려한 추천
+     */
+//    public List<Long> recommendByRoute(Long userId, double depLat, double depLng,
+//                                      double destLat, double destLng, double radius, int topN) {
+//        try {
+//            log.info("Route-based recommendation for user {} from ({}, {}) to ({}, {}) within {}m",
+//                    userId, depLat, depLng, destLat, destLng, radius);
+//
+//            // 1) 사용자 조회
+//            User user = userRepository.findById(userId)
+//                    .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+//
+//            // 2) 경계박스 생성 (출발지와 도착지 각각 반경 기반)
+//            double[] depBox = createBoundingBox(depLat, depLng, radius);
+//            double[] destBox = createBoundingBox(destLat, destLng, radius);
+//
+//            // 3) 교집합 쿼리로 적절한 Post들 조회
+//            List<Post> posts = postRepository.findAllInIntersectionWithDetails(
+//                    depBox[0], depBox[1], depBox[2], depBox[3],    // 출발지 박스
+//                    destBox[0], destBox[1], destBox[2], destBox[3] // 도착지 박스
+//            );
+//
+//            // 4) 사용자가 이미 참여한 그룹 필터링
+//            List<Post> filteredPosts = posts.stream()
+//                    .filter(post -> !hasUserJoined(userId, post))
+//                    .filter(post -> "OPEN".equals(post.getStatus()))
+//                    .filter(post -> post.getDepartureTime().isAfter(java.time.LocalDateTime.now()))
+//                    .toList();
+//
+//            log.info("Found {} suitable posts for route-based recommendation", filteredPosts.size());
+//
+//            if (filteredPosts.isEmpty()) {
+//                return List.of();
+//            }
+//
+//            // 5) 거리와 신뢰도 계산하여 후보 생성 (도착지 정보 포함)
+//            List<Candidate> candidates = filteredPosts.stream()
+//                    .map(post -> createCandidate(post, depLat, depLng, destLat, destLng))
+//                    .toList();
+//
+//            // 6) AI 호출
+//            RecommendRequest request = new RecommendRequest(
+//                    userId,
+//                    nullToZero(user.getMoneyWeight()),
+//                    nullToZero(user.getDistanceWeight()),
+//                    nullToZero(user.getTrustWeight()),
+//                    candidates,
+//                    topN
+//            );
+//
+//            return client.rank(request);
+//
+//        } catch (Exception e) {
+//            log.error("Route-based recommendation failed for user {}: {}", userId, e.getMessage(), e);
+//            return List.of();
+//        }
+//    }
     
     /**
      * 📝 기존 방식: 단일 좌표 반경 기반 추천 (하위 호환성)
@@ -341,7 +403,7 @@ public class RecommendService {
         
         return new Candidate(
             post.getPostId(),
-            post.getEstimatedPrice().doubleValue(),
+            post.getEstimatePricePerMember().doubleValue(),
             totalDistance,  // 🆕 출발지 + 도착지 종합 거리
             averageTrust    // 🆕 그룹 멤버 평균 trust
         );

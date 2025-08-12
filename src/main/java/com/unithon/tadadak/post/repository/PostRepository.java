@@ -10,11 +10,6 @@ import java.util.Optional;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 3718bf4 (bill 도메인 추가 + post 도메인 수정)
     @Query(value = """
         SELECT 
             p.post_id       AS postId,
@@ -56,16 +51,16 @@ public interface PostRepository extends JpaRepository<Post, Long> {
      * 📝 성능 최적화: Post와 연관된 모든 엔티티를 한 번에 조회 (fetch join)
      */
     @Query("""
-        SELECT DISTINCT p 
-        FROM Post p
-        LEFT JOIN FETCH p.host h
-        LEFT JOIN FETCH p.startLocation sl
-        LEFT JOIN FETCH p.endLocation el  
-        LEFT JOIN FETCH p.groups g
-        WHERE p.postId IN :postIds
-        ORDER BY p.createdAt DESC
-        """)
-    List<Post> findAllByIdWithDetails(@Param("postIds") List<Long> postIds);
+  select distinct p
+  from Post p
+  left join fetch p.host
+  left join fetch p.startLocation
+  left join fetch p.endLocation
+  left join fetch p.groups g
+  where p.postId in :ids
+""")
+    List<Post> findAllByIdWithDetails(@Param("ids") List<Long> ids);
+
 
     /**
      * 📝 성능 최적화: 단일 Post 상세 조회 (fetch join)
